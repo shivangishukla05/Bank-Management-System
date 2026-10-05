@@ -16,6 +16,7 @@ struct Account {
     string name;
     int age;
     string phone;
+    string pin;
     double balance;
 };
 
@@ -24,14 +25,17 @@ struct Account {
 const string ACCOUNT_FILE = "accounts.txt";
 const string TRANSACTION_FILE = "transactions.txt";
 
-// ==================== UTILITY FUNCTIONS ====================
+// ==================== INPUT CLEAR ====================
 
 void clearInput() {
     cin.clear();
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
 }
 
+// ==================== CURRENT DATE & TIME ====================
+
 string getCurrentTime() {
+
     time_t now = time(0);
     tm *localTime = localtime(&now);
 
@@ -46,6 +50,24 @@ string getCurrentTime() {
        << setw(2) << localTime->tm_sec;
 
     return ss.str();
+}
+
+// ==================== PIN VALIDATION ====================
+
+bool validPIN(string pin) {
+
+    if (pin.length() != 6) {
+        return false;
+    }
+
+    for (char c : pin) {
+
+        if (!isdigit(c)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 // ==================== LOAD ACCOUNTS ====================
@@ -66,6 +88,7 @@ vector<Account> loadAccounts() {
     while (getline(file, line)) {
 
         stringstream ss(line);
+
         string accountNumber;
         string age;
         string balance;
@@ -74,9 +97,11 @@ vector<Account> loadAccounts() {
         getline(ss, acc.name, '|');
         getline(ss, age, '|');
         getline(ss, acc.phone, '|');
+        getline(ss, acc.pin, '|');
         getline(ss, balance, '|');
 
         if (!accountNumber.empty()) {
+
             acc.accountNumber = stoll(accountNumber);
             acc.age = stoi(age);
             acc.balance = stod(balance);
@@ -102,6 +127,7 @@ void saveAccounts(const vector<Account>& accounts) {
              << acc.name << "|"
              << acc.age << "|"
              << acc.phone << "|"
+             << acc.pin << "|"
              << fixed << setprecision(2)
              << acc.balance << "\n";
     }
@@ -127,7 +153,10 @@ long long generateAccountNumber(const vector<Account>& accounts) {
 
 // ==================== FIND ACCOUNT ====================
 
-int findAccount(const vector<Account>& accounts, long long accountNumber) {
+int findAccount(
+    const vector<Account>& accounts,
+    long long accountNumber
+) {
 
     for (int i = 0; i < accounts.size(); i++) {
 
@@ -139,7 +168,25 @@ int findAccount(const vector<Account>& accounts, long long accountNumber) {
     return -1;
 }
 
-// ==================== TRANSACTION HISTORY ====================
+// ==================== VERIFY PIN ====================
+
+bool verifyPIN(const Account& account) {
+
+    string enteredPIN;
+
+    cout << "Enter 6-digit PIN: ";
+    cin >> enteredPIN;
+
+    if (enteredPIN == account.pin) {
+        return true;
+    }
+
+    cout << "Incorrect PIN!\n";
+
+    return false;
+}
+
+// ==================== SAVE TRANSACTION ====================
 
 void saveTransaction(
     long long accountNumber,
@@ -171,20 +218,40 @@ void createAccount(vector<Account>& accounts) {
     cout << "\n========== CREATE ACCOUNT ==========\n";
 
     cout << "Enter your name: ";
+
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
     getline(cin, acc.name);
 
     cout << "Enter your age: ";
     cin >> acc.age;
 
     if (cin.fail() || acc.age <= 0) {
+
         clearInput();
+
         cout << "Invalid age!\n";
+
         return;
     }
 
     cout << "Enter phone number: ";
     cin >> acc.phone;
+
+    // ==================== PIN SETUP ====================
+
+    while (true) {
+
+        cout << "Set your 6-digit PIN: ";
+        cin >> acc.pin;
+
+        if (validPIN(acc.pin)) {
+            break;
+        }
+
+        cout << "Invalid PIN!\n";
+        cout << "PIN must contain exactly 6 digits.\n";
+    }
 
     acc.balance = 0;
 
@@ -192,8 +259,12 @@ void createAccount(vector<Account>& accounts) {
 
     saveAccounts(accounts);
 
-    cout << "\nAccount created successfully!\n";
-    cout << "Your Account Number: " << acc.accountNumber << "\n";
+    cout << "\n====================================\n";
+    cout << "Account created successfully!\n";
+    cout << "Your Account Number: "
+         << acc.accountNumber << "\n";
+    cout << "Initial Balance: ₹0.00\n";
+    cout << "====================================\n";
 }
 
 // ==================== DEPOSIT ====================
@@ -211,7 +282,13 @@ void depositMoney(vector<Account>& accounts) {
     int index = findAccount(accounts, accountNumber);
 
     if (index == -1) {
+
         cout << "Account not found!\n";
+
+        return;
+    }
+
+    if (!verifyPIN(accounts[index])) {
         return;
     }
 
@@ -219,8 +296,11 @@ void depositMoney(vector<Account>& accounts) {
     cin >> amount;
 
     if (cin.fail() || amount <= 0) {
+
         clearInput();
+
         cout << "Invalid amount!\n";
+
         return;
     }
 
@@ -236,6 +316,7 @@ void depositMoney(vector<Account>& accounts) {
     );
 
     cout << "\nAmount deposited successfully!\n";
+
     cout << "New Balance: ₹"
          << fixed << setprecision(2)
          << accounts[index].balance << "\n";
@@ -256,7 +337,13 @@ void withdrawMoney(vector<Account>& accounts) {
     int index = findAccount(accounts, accountNumber);
 
     if (index == -1) {
+
         cout << "Account not found!\n";
+
+        return;
+    }
+
+    if (!verifyPIN(accounts[index])) {
         return;
     }
 
@@ -264,13 +351,18 @@ void withdrawMoney(vector<Account>& accounts) {
     cin >> amount;
 
     if (cin.fail() || amount <= 0) {
+
         clearInput();
+
         cout << "Invalid amount!\n";
+
         return;
     }
 
     if (amount > accounts[index].balance) {
+
         cout << "Insufficient balance!\n";
+
         return;
     }
 
@@ -286,6 +378,7 @@ void withdrawMoney(vector<Account>& accounts) {
     );
 
     cout << "\nAmount withdrawn successfully!\n";
+
     cout << "Remaining Balance: ₹"
          << fixed << setprecision(2)
          << accounts[index].balance << "\n";
@@ -305,7 +398,13 @@ void checkBalance(const vector<Account>& accounts) {
     int index = findAccount(accounts, accountNumber);
 
     if (index == -1) {
+
         cout << "Account not found!\n";
+
+        return;
+    }
+
+    if (!verifyPIN(accounts[index])) {
         return;
     }
 
@@ -334,11 +433,17 @@ void accountDetails(const vector<Account>& accounts) {
     int index = findAccount(accounts, accountNumber);
 
     if (index == -1) {
+
         cout << "Account not found!\n";
+
         return;
     }
 
-    Account acc = accounts[index];
+    if (!verifyPIN(accounts[index])) {
+        return;
+    }
+
+    const Account& acc = accounts[index];
 
     cout << "\n-----------------------------------\n";
     cout << "Account Number : " << acc.accountNumber << "\n";
@@ -367,7 +472,13 @@ void transferMoney(vector<Account>& accounts) {
     int senderIndex = findAccount(accounts, sender);
 
     if (senderIndex == -1) {
+
         cout << "Sender account not found!\n";
+
+        return;
+    }
+
+    if (!verifyPIN(accounts[senderIndex])) {
         return;
     }
 
@@ -377,12 +488,16 @@ void transferMoney(vector<Account>& accounts) {
     int receiverIndex = findAccount(accounts, receiver);
 
     if (receiverIndex == -1) {
+
         cout << "Receiver account not found!\n";
+
         return;
     }
 
     if (sender == receiver) {
+
         cout << "You cannot transfer money to the same account!\n";
+
         return;
     }
 
@@ -390,17 +505,23 @@ void transferMoney(vector<Account>& accounts) {
     cin >> amount;
 
     if (cin.fail() || amount <= 0) {
+
         clearInput();
+
         cout << "Invalid amount!\n";
+
         return;
     }
 
     if (amount > accounts[senderIndex].balance) {
+
         cout << "Insufficient balance!\n";
+
         return;
     }
 
     accounts[senderIndex].balance -= amount;
+
     accounts[receiverIndex].balance += amount;
 
     saveAccounts(accounts);
@@ -420,7 +541,9 @@ void transferMoney(vector<Account>& accounts) {
     );
 
     cout << "\nTransfer successful!\n";
-    cout << "₹" << fixed << setprecision(2)
+
+    cout << "₹"
+         << fixed << setprecision(2)
          << amount
          << " transferred successfully.\n";
 }
@@ -439,14 +562,18 @@ void transactionHistory() {
     ifstream file(TRANSACTION_FILE);
 
     if (!file) {
+
         cout << "No transactions found.\n";
+
         return;
     }
 
     string line;
+
     bool found = false;
 
     cout << "\n";
+
     cout << left
          << setw(22) << "Date & Time"
          << setw(20) << "Type"
@@ -486,6 +613,7 @@ void transactionHistory() {
     file.close();
 
     if (!found) {
+
         cout << "No transactions found for this account.\n";
     }
 }
@@ -504,13 +632,22 @@ void closeAccount(vector<Account>& accounts) {
     int index = findAccount(accounts, accountNumber);
 
     if (index == -1) {
+
         cout << "Account not found!\n";
+
+        return;
+    }
+
+    if (!verifyPIN(accounts[index])) {
         return;
     }
 
     if (accounts[index].balance != 0) {
+
         cout << "Account cannot be closed.\n";
-        cout << "Please withdraw/transfer your remaining balance first.\n";
+
+        cout << "Please withdraw or transfer your remaining balance first.\n";
+
         return;
     }
 
@@ -526,6 +663,7 @@ void closeAccount(vector<Account>& accounts) {
 void showMenu() {
 
     cout << "\n\n";
+
     cout << "=========================================\n";
     cout << "       BANK MANAGEMENT SYSTEM\n";
     cout << "=========================================\n";
@@ -553,7 +691,7 @@ int main() {
 
     cout << "\n";
     cout << "=========================================\n";
-    cout << "     WELCOME TO BANK MANAGEMENT SYSTEM\n";
+    cout << "   WELCOME TO BANK MANAGEMENT SYSTEM\n";
     cout << "=========================================\n";
 
     while (true) {
@@ -564,8 +702,11 @@ int main() {
         cin >> choice;
 
         if (cin.fail()) {
+
             clearInput();
+
             cout << "\nInvalid choice! Please enter a number.\n";
+
             continue;
         }
 
@@ -604,11 +745,14 @@ int main() {
                 break;
 
             case 9:
+
                 cout << "\nThank you for using Bank Management System!\n";
                 cout << "Goodbye!\n";
+
                 return 0;
 
             default:
+
                 cout << "\nInvalid choice! Please choose 1-9.\n";
         }
     }
